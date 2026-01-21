@@ -163,11 +163,21 @@ function initApplication() {
             
             console.log('🔧 Creating document from template...');
             
-            // Create a JSZip instance with the template content
-            const zip = new JSZip(templateContent);
+            // Create a JSZip instance - FIXED: JSZip 3.0 doesn't accept parameters in constructor
+            const zip = new JSZip();
+            
+            // Load the template content into JSZip
+            // First convert array buffer to Uint8Array
+            const uint8Array = new Uint8Array(templateContent);
+            
+            // Load the zip content
+            await zip.loadAsync(uint8Array);
             
             // Create a docxtemplater instance
             const doc = new docxtemplater();
+            
+            // IMPORTANT: docxtemplater expects the zip to be loaded in a specific way
+            // We need to use the zip instance directly
             doc.loadZip(zip);
             
             // Set the data to replace placeholders
@@ -205,9 +215,12 @@ function initApplication() {
             
             // Generate the output as a blob
             console.log('💾 Generating output file...');
-            const out = doc.getZip().generate({
+            
+            // Generate the zip content as a blob
+            const out = await doc.getZip().generateAsync({
                 type: 'blob',
-                mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+                mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                compression: 'DEFLATE'
             });
             
             console.log('✅ Document generated, size:', out.size, 'bytes');
@@ -215,6 +228,46 @@ function initApplication() {
             
         } catch (error) {
             console.error('❌ Document generation failed:', error);
+            throw error;
+        }
+    }
+    
+    // Alternative method using a simpler approach
+    async function generateDocumentAlternative(data) {
+        try {
+            console.log('⚙️ Starting document generation (alternative method)...');
+            
+            // Load the template
+            const response = await fetch('template.docx');
+            const arrayBuffer = await response.arrayBuffer();
+            
+            // Create JSZip instance and load the template
+            const zip = new JSZip();
+            await zip.loadAsync(arrayBuffer);
+            
+            // Create docxtemplater instance
+            const doc = new docxtemplater();
+            doc.loadZip(zip);
+            doc.setData(data);
+            
+            // Try to render
+            try {
+                doc.render();
+            } catch (renderError) {
+                console.error('Render error:', renderError);
+                throw renderError;
+            }
+            
+            // Generate the output
+            const out = await doc.getZip().generateAsync({
+                type: 'blob',
+                mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+            });
+            
+            return out;
+            
+        } catch (error) {
+            console.error('Alternative method failed:', error);
             throw error;
         }
     }
@@ -248,9 +301,16 @@ function initApplication() {
         previewBtn.disabled = true;
         
         try {
-            // Generate the document
+            // Generate the document - try main method first, then alternative
             console.log('🚀 Generating document...');
-            const docBlob = await generateDocument(templateData);
+            let docBlob;
+            
+            try {
+                docBlob = await generateDocument(templateData);
+            } catch (firstError) {
+                console.log('First method failed, trying alternative...', firstError);
+                docBlob = await generateDocumentAlternative(templateData);
+            }
             
             // Create filename
             const safeName = name.replace(/[^\w\s.-]/gi, '_');
@@ -279,8 +339,17 @@ function initApplication() {
             } else if (error.message.includes('Template error')) {
                 errorMessage += 'Template Error:\n';
                 errorMessage += error.message;
+                
+                // Add specific guidance for common template errors
+                if (error.message.includes('XML')) {
+                    errorMessage += '\n\nThis might mean your template.docx is corrupted or not a valid Word document.';
+                    errorMessage += '\nTry creating a new template with simple placeholders.';
+                }
             } else if (error.message.includes('network') || error.message.includes('fetch')) {
                 errorMessage += 'Network Error:\nPlease check your internet connection and try again.';
+            } else if (error.message.includes('JSZip') || error.message.includes('constructor')) {
+                errorMessage += 'Library Error:\nJSZip library issue. Please refresh the page.\n';
+                errorMessage += 'If problem persists, try using a different browser.';
             } else {
                 errorMessage += 'Error:\n' + error.message;
             }
@@ -337,6 +406,21 @@ function initApplication() {
                 if (blob.size === 0) {
                     console.warn('⚠️ Warning: Template file is empty (0 bytes)');
                 }
+                
+                // Test if it's a valid DOCX by checking the file signature
+                const arrayBuffer = await blob.slice(0, 8).arrayBuffer();
+                const view = new Uint8Array(arrayBuffer);
+                const hex = Array.from(view).map(b => b.toString(16).padStart(2, '0')).join(' ');
+                
+                console.log('🔍 File signature (first 8 bytes):', hex);
+                
+                // DOCX files are ZIP files with PK header
+                if (hex.startsWith('50 4b 03 04') || hex.startsWith('50 4b 05 06') || hex.startsWith('50 4b 07 08')) {
+                    console.log('✅ File appears to be a valid ZIP/DOCX file');
+                } else {
+                    console.warn('⚠️ File may not be a valid DOCX/ZIP file');
+                    console.warn('Expected ZIP signature (PK...), got:', hex.substring(0, 11));
+                }
             } else {
                 console.warn('⚠️ Template file not found (HTTP ' + response.status + ')');
                 console.warn('Make sure template.docx exists in the same directory');
@@ -358,24 +442,41 @@ function initApplication() {
             console.log('Size:', blob.size, 'bytes');
             console.log('Type:', blob.type);
             
-            // Try to read first few bytes to verify it's a DOCX
-            const arrayBuffer = await blob.slice(0, 4).arrayBuffer();
-            const view = new Uint8Array(arrayBuffer);
-            const signature = Array.from(view).map(b => b.toString(16).padStart(2, '0')).join(' ');
+            // Test JSZip loading
+            const arrayBuffer = await blob.arrayBuffer();
+            const zip = new JSZip();
             
-            console.log('File signature (first 4 bytes):', signature);
+            console.log('Testing JSZip loading...');
+            const loadedZip = await zip.loadAsync(arrayBuffer);
+            console.log('✅ JSZip loaded successfully');
             
-            // DOCX should start with PK (ZIP format)
-            if (signature.includes('50 4b')) {
-                console.log('✅ File appears to be a valid DOCX (ZIP format)');
-            } else {
-                console.warn('⚠️ File may not be a valid DOCX');
+            // Check what files are in the zip
+            const files = Object.keys(loadedZip.files);
+            console.log('Files in DOCX:', files.length);
+            
+            // DOCX should contain these standard files
+            const expectedFiles = ['[Content_Types].xml', '_rels/.rels', 'word/document.xml'];
+            const foundFiles = expectedFiles.filter(f => files.includes(f));
+            
+            console.log('Expected DOCX files found:', foundFiles.length + '/' + expectedFiles.length);
+            
+            if (foundFiles.length === 0) {
+                console.warn('⚠️ No standard DOCX files found - may not be a valid Word document');
             }
             
-            return true;
+            return {
+                success: true,
+                size: blob.size,
+                type: blob.type,
+                zipFiles: files.length,
+                isValidDocx: foundFiles.length > 0
+            };
         } catch (error) {
             console.error('❌ Template test failed:', error);
-            return false;
+            return {
+                success: false,
+                error: error.message
+            };
         }
     };
     
@@ -394,6 +495,60 @@ function initApplication() {
         console.table(tests);
         
         return Object.values(tests).every(test => test !== false && test !== 'Not loaded');
+    };
+    
+    // Test docxtemplater with JSZip integration
+    window.testDocxtemplater = async function() {
+        console.log('🧪 Testing docxtemplater with JSZip...');
+        
+        try {
+            // Create a simple test
+            const zip = new JSZip();
+            
+            // Add minimal DOCX structure
+            zip.file("[Content_Types].xml", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="xml" ContentType="application/xml"/>
+  <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
+</Types>`);
+            
+            zip.file("_rels/.rels", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+</Relationships>`);
+            
+            zip.file("word/document.xml", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p>
+      <w:r>
+        <w:t>Hello {{name}}, your roll number is {{rollNo}} in section {{section}}.</w:t>
+      </w:r>
+    </w:p>
+  </w:body>
+</w:document>`);
+            
+            // Create docxtemplater instance
+            const doc = new docxtemplater();
+            doc.loadZip(zip);
+            doc.setData({
+                name: "Test Student",
+                rollNo: "TEST123",
+                section: "Test Section"
+            });
+            
+            doc.render();
+            
+            // Generate output
+            const blob = await doc.getZip().generateAsync({type: 'blob'});
+            
+            console.log('✅ docxtemplater test passed, generated blob size:', blob.size);
+            return blob;
+            
+        } catch (error) {
+            console.error('❌ docxtemplater test failed:', error);
+            return null;
+        }
     };
     
     // Run initial library test
