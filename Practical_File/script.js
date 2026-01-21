@@ -1,428 +1,463 @@
 /**
- * Document Generator - Frontend-only Word Template Automation
- * Using PizZip (JSZip fork) for compatibility with docxtemplater
+ * Document Generator using Mammoth.js
+ * Simple and reliable .docx template replacement
  */
 
-// Global state
-const state = {
-    isInitialized: false,
-    librariesLoaded: false
-};
-
-// DOM Elements
-let documentForm, nameInput, rollNoInput, sectionInput;
-let generateBtn, previewBtn, previewSection;
-let previewName, previewRollNo, previewSectionValue;
-let statusMessages;
-
-// Initialize when DOM is loaded
-document.addEventListener('DOMContentLoaded', function() {
-    console.log('📄 Document Generator Initializing...');
-    
-    // Get DOM elements
-    documentForm = document.getElementById('documentForm');
-    nameInput = document.getElementById('name');
-    rollNoInput = document.getElementById('rollNo');
-    sectionInput = document.getElementById('section');
-    generateBtn = document.getElementById('generateBtn');
-    previewBtn = document.getElementById('previewBtn');
-    previewSection = document.getElementById('previewSection');
-    previewName = document.getElementById('previewName');
-    previewRollNo = document.getElementById('previewRollNo');
-    previewSectionValue = document.getElementById('previewSection');
-    statusMessages = document.getElementById('statusMessages');
-    
-    // Check if libraries are loaded
-    checkLibraries();
-    
-    // Initialize form handlers
-    initFormHandlers();
-    
-    // Test template availability
-    setTimeout(testTemplateAvailability, 1000);
-});
-
-// Check if required libraries are loaded
-function checkLibraries() {
-    addStatus('🔍 Checking libraries...', 'info');
-    
-    const checkInterval = setInterval(() => {
-        const pizzipLoaded = typeof PizZip !== 'undefined';
-        const docxtemplaterLoaded = typeof docxtemplater !== 'undefined';
-        const filesaverLoaded = typeof saveAs !== 'undefined';
+class DocumentGenerator {
+    constructor() {
+        this.state = {
+            initialized: false,
+            templateLoaded: false,
+            templateData: null
+        };
         
-        if (pizzipLoaded && docxtemplaterLoaded && filesaverLoaded) {
-            clearInterval(checkInterval);
-            state.librariesLoaded = true;
-            addStatus('✅ All libraries loaded successfully', 'success');
-            console.log('PizZip loaded:', typeof PizZip);
-            console.log('docxtemplater loaded:', typeof docxtemplater);
-            console.log('FileSaver loaded:', typeof saveAs);
-            
-            // Mark as initialized
-            state.isInitialized = true;
-            addStatus('🚀 Application ready to use', 'success');
-            
-            // Enable form
-            enableForm(true);
+        this.init();
+    }
+    
+    async init() {
+        this.log('🚀 Initializing Document Generator...', 'info');
+        
+        // Get DOM elements
+        this.elements = {
+            form: document.getElementById('documentForm'),
+            nameInput: document.getElementById('name'),
+            rollNoInput: document.getElementById('rollNo'),
+            sectionInput: document.getElementById('section'),
+            generateBtn: document.getElementById('generateBtn'),
+            previewBtn: document.getElementById('previewBtn'),
+            testBtn: document.getElementById('testBtn'),
+            previewSection: document.getElementById('previewSection'),
+            previewName: document.getElementById('previewName'),
+            previewRollNo: document.getElementById('previewRollNo'),
+            previewSectionValue: document.getElementById('previewSection'),
+            statusLog: document.getElementById('statusLog'),
+            clearLogBtn: document.getElementById('clearLogBtn'),
+            exportLogBtn: document.getElementById('exportLogBtn')
+        };
+        
+        // Initialize event listeners
+        this.initEventListeners();
+        
+        // Check if libraries are loaded
+        this.checkLibraries();
+        
+        // Test template availability
+        await this.testTemplate();
+        
+        this.state.initialized = true;
+        this.log('✅ Document Generator initialized successfully', 'success');
+    }
+    
+    log(message, type = 'info') {
+        const timestamp = new Date().toLocaleTimeString();
+        const logEntry = document.createElement('div');
+        logEntry.className = `log-entry ${type}`;
+        logEntry.textContent = `[${timestamp}] ${message}`;
+        
+        if (this.elements.statusLog) {
+            this.elements.statusLog.appendChild(logEntry);
+            this.elements.statusLog.scrollTop = this.elements.statusLog.scrollHeight;
         }
         
-        // Timeout after 10 seconds
-        setTimeout(() => {
-            if (!state.librariesLoaded) {
-                clearInterval(checkInterval);
-                addStatus('❌ Failed to load libraries. Please refresh the page.', 'error');
-                enableForm(false);
-            }
-        }, 10000);
-    }, 100);
-}
-
-// Add status message
-function addStatus(message, type = 'info') {
-    const timestamp = new Date().toLocaleTimeString();
-    const statusDiv = document.createElement('div');
-    statusDiv.className = `status-${type}`;
-    statusDiv.innerHTML = `[${timestamp}] ${message}`;
-    
-    if (statusMessages) {
-        statusMessages.appendChild(statusDiv);
-        statusMessages.scrollTop = statusMessages.scrollHeight;
+        console.log(`[${type.toUpperCase()}] ${message}`);
     }
     
-    console.log(`[${type.toUpperCase()}] ${message}`);
-}
-
-// Enable/disable form
-function enableForm(enabled) {
-    if (generateBtn) generateBtn.disabled = !enabled;
-    if (previewBtn) previewBtn.disabled = !enabled;
-    
-    if (enabled) {
-        addStatus('✅ Form enabled - ready to generate documents', 'success');
-    } else {
-        addStatus('⚠️ Form disabled - waiting for libraries', 'warning');
-    }
-}
-
-// Initialize form handlers
-function initFormHandlers() {
-    if (!documentForm) return;
-    
-    // Preview button click handler
-    previewBtn.addEventListener('click', function() {
-        const name = nameInput.value.trim();
-        const rollNo = rollNoInput.value.trim();
-        const section = sectionInput.value.trim();
+    checkLibraries() {
+        if (typeof mammoth === 'undefined') {
+            this.log('❌ Mammoth.js not loaded', 'error');
+            return false;
+        }
         
-        if (!name || !rollNo || !section) {
+        if (typeof JSZip === 'undefined') {
+            this.log('❌ JSZip not loaded', 'error');
+            return false;
+        }
+        
+        if (typeof saveAs === 'undefined') {
+            this.log('❌ FileSaver not loaded', 'error');
+            return false;
+        }
+        
+        this.log('✅ All libraries loaded successfully', 'success');
+        return true;
+    }
+    
+    initEventListeners() {
+        // Preview button
+        if (this.elements.previewBtn) {
+            this.elements.previewBtn.addEventListener('click', () => this.showPreview());
+        }
+        
+        // Test button
+        if (this.elements.testBtn) {
+            this.elements.testBtn.addEventListener('click', () => this.testTemplate());
+        }
+        
+        // Form submission
+        if (this.elements.form) {
+            this.elements.form.addEventListener('submit', (e) => {
+                e.preventDefault();
+                this.generateDocument();
+            });
+        }
+        
+        // Clear log button
+        if (this.elements.clearLogBtn) {
+            this.elements.clearLogBtn.addEventListener('click', () => {
+                if (this.elements.statusLog) {
+                    this.elements.statusLog.innerHTML = '';
+                    this.log('Log cleared', 'info');
+                }
+            });
+        }
+        
+        // Export log button
+        if (this.elements.exportLogBtn) {
+            this.elements.exportLogBtn.addEventListener('click', () => {
+                if (this.elements.statusLog) {
+                    const logText = this.elements.statusLog.textContent;
+                    const blob = new Blob([logText], { type: 'text/plain' });
+                    saveAs(blob, 'document_generator_log.txt');
+                    this.log('Log exported', 'success');
+                }
+            });
+        }
+        
+        // Real-time validation
+        const inputs = [this.elements.nameInput, this.elements.rollNoInput, this.elements.sectionInput];
+        inputs.forEach(input => {
+            if (input) {
+                input.addEventListener('input', () => this.validateForm());
+            }
+        });
+        
+        this.validateForm();
+    }
+    
+    validateForm() {
+        const name = this.elements.nameInput?.value.trim() || '';
+        const rollNo = this.elements.rollNoInput?.value.trim() || '';
+        const section = this.elements.sectionInput?.value.trim() || '';
+        
+        const allFilled = name && rollNo && section;
+        
+        if (this.elements.generateBtn) {
+            this.elements.generateBtn.disabled = !allFilled;
+        }
+        
+        if (this.elements.previewBtn) {
+            this.elements.previewBtn.disabled = !allFilled;
+        }
+        
+        return allFilled;
+    }
+    
+    showPreview() {
+        if (!this.validateForm()) {
             alert('Please fill in all fields to preview');
             return;
         }
         
-        // Update preview values
-        previewName.textContent = name;
-        previewRollNo.textContent = rollNo;
-        previewSectionValue.textContent = section;
+        const name = this.elements.nameInput.value.trim();
+        const rollNo = this.elements.rollNoInput.value.trim();
+        const section = this.elements.sectionInput.value.trim();
         
-        // Show preview section
-        previewSection.classList.remove('hidden');
+        this.elements.previewName.textContent = name;
+        this.elements.previewRollNo.textContent = rollNo;
+        this.elements.previewSectionValue.textContent = section;
         
-        addStatus('📊 Preview updated', 'info');
-    });
+        this.elements.previewSection.classList.remove('hidden');
+        this.log('Preview updated', 'info');
+    }
     
-    // Form submission handler
-    documentForm.addEventListener('submit', async function(e) {
-        e.preventDefault();
+    async testTemplate() {
+        this.log('🔍 Testing template availability...', 'info');
         
-        if (!state.librariesLoaded) {
-            addStatus('❌ Libraries not loaded yet. Please wait.', 'error');
-            return;
+        try {
+            const response = await fetch('template.docx');
+            
+            if (!response.ok) {
+                this.log(`❌ Template not found (HTTP ${response.status})`, 'error');
+                this.state.templateLoaded = false;
+                return false;
+            }
+            
+            const blob = await response.blob();
+            this.log(`✅ Template found: ${blob.size} bytes`, 'success');
+            
+            // Test if it's a valid .docx
+            if (blob.size === 0) {
+                this.log('⚠️ Template is empty', 'warning');
+                this.state.templateLoaded = false;
+                return false;
+            }
+            
+            // Try to read with Mammoth to test
+            const arrayBuffer = await blob.arrayBuffer();
+            const result = await mammoth.extractRawText({ arrayBuffer: arrayBuffer });
+            
+            if (result.value) {
+                this.log('✅ Template is a valid .docx file', 'success');
+                
+                // Check for placeholders
+                const text = result.value;
+                const placeholders = {
+                    name: text.includes('{name}'),
+                    rollNo: text.includes('{rollNo}'),
+                    section: text.includes('{section}')
+                };
+                
+                this.log('Placeholder check:', 'info');
+                this.log(`  {name}: ${placeholders.name ? '✅ Found' : '❌ Not found'}`, 
+                        placeholders.name ? 'success' : 'error');
+                this.log(`  {rollNo}: ${placeholders.rollNo ? '✅ Found' : '❌ Not found'}`, 
+                        placeholders.rollNo ? 'success' : 'error');
+                this.log(`  {section}: ${placeholders.section ? '✅ Found' : '❌ Not found'}`, 
+                        placeholders.section ? 'success' : 'error');
+                
+                this.state.templateLoaded = true;
+                return true;
+            } else {
+                this.log('⚠️ Could not read template content', 'warning');
+                this.state.templateLoaded = false;
+                return false;
+            }
+            
+        } catch (error) {
+            this.log(`❌ Template test failed: ${error.message}`, 'error');
+            this.state.templateLoaded = false;
+            return false;
         }
-        
-        // Get form values
-        const name = nameInput.value.trim();
-        const rollNo = rollNoInput.value.trim();
-        const section = sectionInput.value.trim();
-        
-        // Validate inputs
-        if (!name || !rollNo || !section) {
+    }
+    
+    async generateDocument() {
+        if (!this.validateForm()) {
             alert('Please fill in all fields');
             return;
         }
         
-        // Prepare data
-        const templateData = {
-            name: name,
-            rollNo: rollNo,
-            section: section
-        };
-        
-        // Generate document
-        await generateAndDownloadDocument(templateData);
-    });
-    
-    // Real-time validation
-    [nameInput, rollNoInput, sectionInput].forEach(input => {
-        input.addEventListener('input', function() {
-            const allFilled = nameInput.value.trim() && 
-                             rollNoInput.value.trim() && 
-                             sectionInput.value.trim();
-            
-            // Enable/disable buttons
-            if (generateBtn) generateBtn.disabled = !allFilled || !state.librariesLoaded;
-            if (previewBtn) previewBtn.disabled = !allFilled;
-            
-            // Update preview if section is visible
-            if (previewSection && !previewSection.classList.contains('hidden')) {
-                previewBtn.click();
-            }
-        });
-    });
-    
-    // Initialize button states
-    enableForm(false);
-}
-
-// Load template file
-async function loadTemplateFile() {
-    addStatus('📥 Loading template.docx...', 'info');
-    
-    try {
-        // Use fetch API
-        const response = await fetch('template.docx');
-        
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        if (!this.state.templateLoaded) {
+            const shouldContinue = confirm('Template not loaded or invalid. Continue anyway?');
+            if (!shouldContinue) return;
         }
         
-        // Get as array buffer
-        const arrayBuffer = await response.arrayBuffer();
+        this.log('🚀 Starting document generation...', 'info');
         
-        addStatus(`✅ Template loaded: ${arrayBuffer.byteLength} bytes`, 'success');
-        return arrayBuffer;
+        const name = this.elements.nameInput.value.trim();
+        const rollNo = this.elements.rollNoInput.value.trim();
+        const section = this.elements.sectionInput.value.trim();
         
-    } catch (error) {
-        addStatus(`❌ Failed to load template: ${error.message}`, 'error');
-        throw error;
-    }
-}
-
-// Generate and download document
-async function generateAndDownloadDocument(data) {
-    if (!state.librariesLoaded) {
-        addStatus('❌ Libraries not loaded', 'error');
-        return;
-    }
-    
-    // Disable button and show loading state
-    const originalText = generateBtn.innerHTML;
-    generateBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generating...';
-    generateBtn.disabled = true;
-    previewBtn.disabled = true;
-    
-    addStatus('🚀 Starting document generation...', 'info');
-    addStatus(`Data: ${JSON.stringify(data)}`, 'info');
-    
-    try {
-        // Load template
-        const templateArrayBuffer = await loadTemplateFile();
+        this.log(`Data: Name="${name}", RollNo="${rollNo}", Section="${section}"`, 'info');
         
-        if (!templateArrayBuffer || templateArrayBuffer.byteLength === 0) {
-            throw new Error('Template is empty');
-        }
+        // Disable buttons during generation
+        this.setButtonsState(false);
         
-        addStatus('🔧 Creating document from template...', 'info');
-        
-        // Convert array buffer to binary string for PizZip
-        const bytes = new Uint8Array(templateArrayBuffer);
-        let binaryString = '';
-        
-        for (let i = 0; i < bytes.length; i++) {
-            binaryString += String.fromCharCode(bytes[i]);
-        }
-        
-        addStatus(`Converted to binary string: ${binaryString.length} characters`, 'info');
-        
-        // Create PizZip instance with the content
-        // PizZip accepts content in constructor (unlike JSZip 3.0)
-        const zip = new PizZip(binaryString);
-        
-        // Create docxtemplater instance
-        const doc = new docxtemplater();
-        doc.loadZip(zip);
-        
-        // Set the data
-        doc.setData(data);
-        
-        // Render the document
         try {
-            doc.render();
-            addStatus('✅ Template rendered successfully', 'success');
-        } catch (renderError) {
-            addStatus(`❌ Template render error: ${renderError.message}`, 'error');
+            // Step 1: Load the template
+            this.log('📥 Loading template...', 'info');
+            const templateResponse = await fetch('template.docx');
+            const templateBlob = await templateResponse.blob();
+            const templateArrayBuffer = await templateBlob.arrayBuffer();
             
-            let errorDetails = 'Template Error:\n' + renderError.message;
+            // Step 2: Convert .docx to a JSZip object
+            this.log('🔧 Processing .docx file...', 'info');
+            const zip = await JSZip.loadAsync(templateArrayBuffer);
             
-            if (renderError.properties && renderError.properties.key) {
-                errorDetails += `\nAt placeholder: ${renderError.properties.key}`;
+            // Step 3: Extract and modify document.xml (main content)
+            this.log('✏️ Replacing placeholders...', 'info');
+            await this.processDocumentXML(zip, { name, rollNo, section });
+            
+            // Step 4: Generate the new .docx
+            this.log('💾 Generating output file...', 'info');
+            const outputBlob = await zip.generateAsync({
+                type: 'blob',
+                mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+            });
+            
+            // Step 5: Save the file
+            const safeName = name.replace(/[^\w\s.-]/gi, '_');
+            const safeRollNo = rollNo.replace(/[^\w\s.-]/gi, '_');
+            const filename = `${safeName}_${safeRollNo}.docx`;
+            
+            saveAs(outputBlob, filename);
+            
+            this.log(`✅ Document generated successfully: ${filename}`, 'success');
+            this.log(`📦 File size: ${outputBlob.size} bytes`, 'info');
+            
+            // Show success message
+            setTimeout(() => {
+                alert(`✅ Document generated successfully!\n\nFile: ${filename}\n\nCheck your downloads folder.`);
+            }, 500);
+            
+        } catch (error) {
+            this.log(`❌ Document generation failed: ${error.message}`, 'error');
+            console.error('Generation error:', error);
+            
+            alert(`Failed to generate document:\n\n${error.message}\n\nCheck the status log for details.`);
+            
+        } finally {
+            // Re-enable buttons
+            this.setButtonsState(true);
+            this.log('=== Generation complete ===', 'info');
+        }
+    }
+    
+    async processDocumentXML(zip, data) {
+        try {
+            // Get the main document XML file
+            const xmlFile = zip.file('word/document.xml');
+            if (!xmlFile) {
+                throw new Error('Could not find document.xml in the .docx file');
+            }
+            
+            // Read the XML content
+            const xmlContent = await xmlFile.async('text');
+            
+            // Replace placeholders in the XML
+            let modifiedContent = xmlContent;
+            
+            // Replace {name}
+            if (xmlContent.includes('{name}')) {
+                modifiedContent = modifiedContent.replace(/{name}/g, data.name);
+                this.log(`  Replaced {name} with "${data.name}"`, 'success');
+            } else {
+                this.log(`  ⚠️ {name} not found in template`, 'warning');
+            }
+            
+            // Replace {rollNo}
+            if (xmlContent.includes('{rollNo}')) {
+                modifiedContent = modifiedContent.replace(/{rollNo}/g, data.rollNo);
+                this.log(`  Replaced {rollNo} with "${data.rollNo}"`, 'success');
+            } else {
+                this.log(`  ⚠️ {rollNo} not found in template`, 'warning');
+            }
+            
+            // Replace {section}
+            if (xmlContent.includes('{section}')) {
+                modifiedContent = modifiedContent.replace(/{section}/g, data.section);
+                this.log(`  Replaced {section} with "${data.section}"`, 'success');
+            } else {
+                this.log(`  ⚠️ {section} not found in template`, 'warning');
+            }
+            
+            // Update the XML file in the zip
+            zip.file('word/document.xml', modifiedContent);
+            
+            // Also check and update header/footer files if they exist
+            await this.processHeaderFooter(zip, data, 'header');
+            await this.processHeaderFooter(zip, data, 'footer');
+            
+            this.log('✅ Placeholders replaced successfully', 'success');
+            
+        } catch (error) {
+            this.log(`❌ Error processing document XML: ${error.message}`, 'error');
+            throw error;
+        }
+    }
+    
+    async processHeaderFooter(zip, data, type) {
+        try {
+            // Get all header/footer files
+            const files = [];
+            zip.forEach((relativePath, file) => {
+                if (relativePath.includes(`word/${type}`) && relativePath.endsWith('.xml')) {
+                    files.push({ path: relativePath, file: file });
+                }
+            });
+            
+            if (files.length > 0) {
+                this.log(`Found ${files.length} ${type} file(s)`, 'info');
                 
-                // Check for common issues
-                if (renderError.message.includes('not found')) {
-                    errorDetails += '\n\nMake sure your template contains exactly:';
-                    errorDetails += '\n• {{name}}';
-                    errorDetails += '\n• {{rollNo}}';
-                    errorDetails += '\n• {{section}}';
+                for (const { path, file } of files) {
+                    const content = await file.async('text');
+                    let modifiedContent = content;
+                    
+                    // Replace placeholders
+                    modifiedContent = modifiedContent.replace(/{name}/g, data.name);
+                    modifiedContent = modifiedContent.replace(/{rollNo}/g, data.rollNo);
+                    modifiedContent = modifiedContent.replace(/{section}/g, data.section);
+                    
+                    // Update the file
+                    zip.file(path, modifiedContent);
+                    this.log(`  Updated ${path}`, 'success');
                 }
             }
-            
-            throw new Error(errorDetails);
+        } catch (error) {
+            this.log(`⚠️ Could not process ${type} files: ${error.message}`, 'warning');
+            // Don't throw error for header/footer issues
         }
-        
-        // Generate the output
-        addStatus('💾 Generating output file...', 'info');
-        
-        const out = doc.getZip().generate({
-            type: 'blob',
-            mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-            compression: 'DEFLATE'
-        });
-        
-        addStatus(`✅ Document generated: ${out.size} bytes`, 'success');
-        
-        // Create filename
-        const safeName = data.name.replace(/[^\w\s.-]/gi, '_');
-        const safeRollNo = data.rollNo.replace(/[^\w\s.-]/gi, '_');
-        const filename = `${safeName}_${safeRollNo}.docx`;
-        
-        // Save the file
-        saveAs(out, filename);
-        
-        addStatus(`📥 File saved as: ${filename}`, 'success');
-        
-        // Show success message
-        setTimeout(() => {
-            alert(`✅ Document generated successfully!\n\nFile: ${filename}\n\nCheck your downloads folder.`);
-        }, 500);
-        
-    } catch (error) {
-        console.error('Generation error:', error);
-        
-        // Show user-friendly error message
-        let errorMessage = 'Failed to generate document.\n\n';
-        
-        if (error.message.includes('Template file') || error.message.includes('Failed to load') || error.message.includes('HTTP')) {
-            errorMessage += 'Could not load the template file.\n\n';
-            errorMessage += 'Please ensure:\n';
-            errorMessage += '1. template.docx exists in the same folder\n';
-            errorMessage += '2. The file name is exactly "template.docx"\n';
-            errorMessage += '3. The file is a valid Word document (.docx)';
-        } else if (error.message.includes('Template Error')) {
-            errorMessage += error.message;
-        } else if (error.message.includes('PizZip') || error.message.includes('constructor')) {
-            errorMessage += 'Library compatibility issue.\n\n';
-            errorMessage += 'Please try:\n';
-            errorMessage += '1. Refreshing the page\n';
-            errorMessage += '2. Using a different browser\n';
-            errorMessage += '3. Checking browser console (F12) for details';
-        } else {
-            errorMessage += 'Error: ' + error.message;
-        }
-        
-        alert(errorMessage);
-        addStatus(`❌ Error: ${error.message}`, 'error');
-        
-    } finally {
-        // Restore button state
-        generateBtn.innerHTML = originalText;
-        generateBtn.disabled = !state.librariesLoaded;
-        previewBtn.disabled = false;
-        
-        addStatus('=== Generation complete ===', 'info');
     }
-}
-
-// Test template availability
-async function testTemplateAvailability() {
-    addStatus('🔍 Testing template availability...', 'info');
     
-    try {
-        const response = await fetch('template.docx', { method: 'HEAD' });
+    setButtonsState(enabled) {
+        const buttons = [
+            this.elements.generateBtn,
+            this.elements.previewBtn,
+            this.elements.testBtn
+        ];
         
-        if (response.ok) {
-            // Get file size
-            const sizeResponse = await fetch('template.docx');
-            const blob = await sizeResponse.blob();
-            
-            addStatus(`✅ Template found: ${blob.size} bytes (${(blob.size / 1024).toFixed(2)} KB)`, 'success');
-            
-            // Check if it's a valid DOCX (ZIP file)
-            const arrayBuffer = await blob.slice(0, 4).arrayBuffer();
-            const view = new Uint8Array(arrayBuffer);
-            
-            // DOCX files start with "PK" (ZIP signature)
-            const isZipFile = view[0] === 0x50 && view[1] === 0x4B;
-            
-            if (isZipFile) {
-                addStatus('✅ Valid DOCX/ZIP file detected', 'success');
-            } else {
-                addStatus('⚠️ File may not be a valid DOCX (missing ZIP signature)', 'warning');
+        buttons.forEach(btn => {
+            if (btn) {
+                if (!enabled) {
+                    btn.disabled = true;
+                    const originalText = btn.innerHTML;
+                    btn.setAttribute('data-original-text', originalText);
+                    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
+                } else {
+                    btn.disabled = false;
+                    const originalText = btn.getAttribute('data-original-text');
+                    if (originalText) {
+                        btn.innerHTML = originalText;
+                    }
+                }
             }
-            
-            return true;
-        } else {
-            addStatus(`❌ Template not found (HTTP ${response.status})`, 'error');
-            addStatus('Please ensure template.docx exists in the same folder as index.html', 'warning');
-            return false;
-        }
-    } catch (error) {
-        addStatus(`❌ Template check failed: ${error.message}`, 'error');
-        return false;
+        });
     }
 }
 
-// Expose utility functions for debugging
+// Initialize the application when DOM is loaded
+document.addEventListener('DOMContentLoaded', () => {
+    window.documentGenerator = new DocumentGenerator();
+});
+
+// Expose utility functions
 window.debugTools = {
-    testLibraries: function() {
-        return {
-            PizZip: typeof PizZip !== 'undefined',
-            docxtemplater: typeof docxtemplater !== 'undefined',
-            FileSaver: typeof saveAs !== 'undefined',
-            state: state
-        };
+    testTemplate: async () => {
+        if (window.documentGenerator) {
+            return await window.documentGenerator.testTemplate();
+        }
+        return false;
     },
     
-    testTemplate: testTemplateAvailability,
-    
-    createTestDocument: async function() {
-        const testData = {
-            name: "Test Student",
-            rollNo: "TEST001",
-            section: "Test Section"
-        };
-        
-        addStatus('🧪 Creating test document...', 'info');
-        return generateAndDownloadDocument(testData);
+    extractTemplateText: async () => {
+        try {
+            const response = await fetch('template.docx');
+            const blob = await response.blob();
+            const arrayBuffer = await blob.arrayBuffer();
+            const result = await mammoth.extractRawText({ arrayBuffer: arrayBuffer });
+            console.log('Template text:', result.value);
+            return result.value;
+        } catch (error) {
+            console.error('Error:', error);
+            return null;
+        }
     },
     
-    clearStatus: function() {
-        if (statusMessages) {
-            statusMessages.innerHTML = '';
-            addStatus('Status cleared', 'info');
+    showAllFiles: async () => {
+        try {
+            const response = await fetch('template.docx');
+            const blob = await response.blob();
+            const arrayBuffer = await blob.arrayBuffer();
+            const zip = await JSZip.loadAsync(arrayBuffer);
+            
+            console.log('Files in template:');
+            zip.forEach((relativePath, file) => {
+                console.log(`  ${relativePath} (${file._data.uncompressedSize} bytes)`);
+            });
+            
+            return zip;
+        } catch (error) {
+            console.error('Error:', error);
+            return null;
         }
     }
 };
-
-// Add keyboard shortcut for debugging (Ctrl+Shift+D)
-document.addEventListener('keydown', function(e) {
-    if (e.ctrlKey && e.shiftKey && e.key === 'D') {
-        e.preventDefault();
-        const debugInfo = window.debugTools.testLibraries();
-        console.table(debugInfo);
-        addStatus('Debug info logged to console (F12)', 'info');
-    }
-});
-
-// Initial status
-addStatus('Document Generator starting up...', 'info');
-addStatus('Using PizZip + docxtemplater + FileSaver.js', 'info');
