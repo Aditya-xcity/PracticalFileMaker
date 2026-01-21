@@ -363,4 +363,43 @@ footer {
     .form-section, .card, .preview-section {
         padding: 1rem;
     }
+
+}
+
+
+/* Add to existing style.css */
+
+/* Debug panel */
+.debug-panel {
+    background: #f8f9fa;
+    border-radius: 10px;
+    padding: 1.5rem;
+    margin-top: 2rem;
+    border: 1px solid #dc3545;
+    font-family: 'Courier New', monospace;
+    font-size: 0.9rem;
+}
+
+.debug-panel h3 {
+    color: #dc3545;
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+#debugInfo {
+    background: white;
+    padding: 1rem;
+    border-radius: 5px;
+    max-height: 200px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+.version-info {
+    font-size: 0.8rem;
+    color: #6c757d;
+    margin-top: 0.5rem;
 }
