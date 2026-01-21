@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document Generator - Word Template Automation</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1><i class="fas fa-file-word"></i> Word Document Generator</h1>
+            <p class="subtitle">Academic Lab Automation Tool - Replace placeholders in Word templates</p>
+        </header>
+
+        <main>
+            <div class="form-section">
+                <h2><i class="fas fa-user-edit"></i> Student Information</h2>
+                <p class="instructions">Fill in the details below. The placeholders in the template will be replaced with your information.</p>
+                
+                <form id="documentForm">
+                    <div class="form-group">
+                        <label for="name">
+                            <i class="fas fa-user"></i> Full Name
+                        </label>
+                        <input type="text" id="name" placeholder="Enter your full name" required>
+                        <div class="help-text">Will replace <code>{{name}}</code> in the template</div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="rollNo">
+                            <i class="fas fa-id-card"></i> University Roll Number
+                        </label>
+                        <input type="text" id="rollNo" placeholder="Enter your roll number" required>
+                        <div class="help-text">Will replace <code>{{rollNo}}</code> in the template</div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="section">
+                            <i class="fas fa-users"></i> Section
+                        </label>
+                        <input type="text" id="section" placeholder="Enter your section" required>
+                        <div class="help-text">Will replace <code>{{section}}</code> in the template</div>
+                    </div>
+                    
+                    <div class="form-actions">
+                        <button type="button" id="previewBtn" class="btn preview-btn">
+                            <i class="fas fa-eye"></i> Preview Values
+                        </button>
+                        <button type="submit" id="generateBtn" class="btn generate-btn">
+                            <i class="fas fa-download"></i> Download DOCX
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <div class="info-section">
+                <div class="card">
+                    <h3><i class="fas fa-info-circle"></i> How It Works</h3>
+                    <ul>
+                        <li><strong>Template:</strong> Uses <code>template.docx</code> from the project root</li>
+                        <li><strong>Placeholders:</strong> Replace <code>{{name}}</code>, <code>{{rollNo}}</code>, <code>{{section}}</code></li>
+                        <li><strong>Formatting:</strong> All original formatting is preserved</li>
+                        <li><strong>Output:</strong> File named <code>Name_RollNo.docx</code></li>
+                    </ul>
+                </div>
+                
+                <div class="card">
+                    <h3><i class="fas fa-lightbulb"></i> Tips</h3>
+                    <ul>
+                        <li>Make sure the template file is in the project root</li>
+                        <li>Placeholders in the template must match exactly (case-sensitive)</li>
+                        <li>Works entirely in your browser - no server required</li>
+                        <li>Compatible with GitHub Pages deployment</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="preview-section hidden" id="previewSection">
+                <h3><i class="fas fa-search"></i> Preview Replacement</h3>
+                <div class="preview-content">
+                    <div class="placeholder-preview">
+                        <h4>Original Placeholders:</h4>
+                        <code>{{name}}</code><br>
+                        <code>{{rollNo}}</code><br>
+                        <code>{{section}}</code>
+                    </div>
+                    <div class="arrow">
+                        <i class="fas fa-arrow-right"></i>
+                    </div>
+                    <div class="value-preview">
+                        <h4>Will be replaced with:</h4>
+                        <span id="previewName">[Your Name]</span><br>
+                        <span id="previewRollNo">[Your Roll Number]</span><br>
+                        <span id="previewSection">[Your Section]</span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Loading indicator -->
+            <div id="loadingIndicator" class="loading-indicator hidden">
+                <div class="loading-content">
+                    <i class="fas fa-spinner fa-spin"></i>
+                    <p>Loading libraries...</p>
+                </div>
+            </div>
+        </main>
+
+        <footer>
+            <p>Document Automation Tool | Built for Academic Lab Automation | Runs entirely in browser</p>
+        </footer>
+    </div>
+
+    <!-- Load required libraries from CDN in correct order -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/docxtemplater/3.42.4/docxtemplater.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    
+    <!-- Load our main script -->
+    <script src="script.js"></script>
+</body>
+</html>
