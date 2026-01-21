@@ -1,90 +1,113 @@
 /**
  * Document Generator - Frontend-only Word Template Automation
- * This script runs entirely in the browser and generates Word documents
- * by replacing placeholders in a template.docx file
- * Using JSZip 2.7.1 for compatibility with docxtemplater
+ * Using PizZip (JSZip fork) for compatibility with docxtemplater
  */
 
 // Global state
-let appInitialized = false;
+const state = {
+    isInitialized: false,
+    librariesLoaded: false
+};
+
+// DOM Elements
+let documentForm, nameInput, rollNoInput, sectionInput;
+let generateBtn, previewBtn, previewSection;
+let previewName, previewRollNo, previewSectionValue;
+let statusMessages;
 
 // Initialize when DOM is loaded
 document.addEventListener('DOMContentLoaded', function() {
     console.log('📄 Document Generator Initializing...');
     
-    // Check libraries are loaded
-    setTimeout(initializeApp, 100);
+    // Get DOM elements
+    documentForm = document.getElementById('documentForm');
+    nameInput = document.getElementById('name');
+    rollNoInput = document.getElementById('rollNo');
+    sectionInput = document.getElementById('section');
+    generateBtn = document.getElementById('generateBtn');
+    previewBtn = document.getElementById('previewBtn');
+    previewSection = document.getElementById('previewSection');
+    previewName = document.getElementById('previewName');
+    previewRollNo = document.getElementById('previewRollNo');
+    previewSectionValue = document.getElementById('previewSection');
+    statusMessages = document.getElementById('statusMessages');
+    
+    // Check if libraries are loaded
+    checkLibraries();
+    
+    // Initialize form handlers
+    initFormHandlers();
+    
+    // Test template availability
+    setTimeout(testTemplateAvailability, 1000);
 });
 
-function initializeApp() {
-    // Check if required libraries are loaded
-    if (typeof JSZip === 'undefined') {
-        showError('JSZip library not loaded. Please check your internet connection and refresh the page.');
-        return;
-    }
+// Check if required libraries are loaded
+function checkLibraries() {
+    addStatus('🔍 Checking libraries...', 'info');
     
-    if (typeof docxtemplater === 'undefined') {
-        showError('docxtemplater library not loaded. Please check your internet connection and refresh the page.');
-        return;
-    }
-    
-    if (typeof saveAs === 'undefined') {
-        showError('FileSaver library not loaded. Please check your internet connection and refresh the page.');
-        return;
-    }
-    
-    console.log('✅ All libraries loaded:');
-    console.log('JSZip version:', JSZip.version);
-    console.log('docxtemplater version:', docxtemplater.version);
-    
-    // Initialize the application
-    initApplication();
-    appInitialized = true;
+    const checkInterval = setInterval(() => {
+        const pizzipLoaded = typeof PizZip !== 'undefined';
+        const docxtemplaterLoaded = typeof docxtemplater !== 'undefined';
+        const filesaverLoaded = typeof saveAs !== 'undefined';
+        
+        if (pizzipLoaded && docxtemplaterLoaded && filesaverLoaded) {
+            clearInterval(checkInterval);
+            state.librariesLoaded = true;
+            addStatus('✅ All libraries loaded successfully', 'success');
+            console.log('PizZip loaded:', typeof PizZip);
+            console.log('docxtemplater loaded:', typeof docxtemplater);
+            console.log('FileSaver loaded:', typeof saveAs);
+            
+            // Mark as initialized
+            state.isInitialized = true;
+            addStatus('🚀 Application ready to use', 'success');
+            
+            // Enable form
+            enableForm(true);
+        }
+        
+        // Timeout after 10 seconds
+        setTimeout(() => {
+            if (!state.librariesLoaded) {
+                clearInterval(checkInterval);
+                addStatus('❌ Failed to load libraries. Please refresh the page.', 'error');
+                enableForm(false);
+            }
+        }, 10000);
+    }, 100);
 }
 
-function showError(message) {
-    console.error('❌', message);
-    alert('Error: ' + message);
-}
-
-function initApplication() {
-    console.log('🚀 Initializing Document Generator Application');
+// Add status message
+function addStatus(message, type = 'info') {
+    const timestamp = new Date().toLocaleTimeString();
+    const statusDiv = document.createElement('div');
+    statusDiv.className = `status-${type}`;
+    statusDiv.innerHTML = `[${timestamp}] ${message}`;
     
-    // DOM Elements
-    const documentForm = document.getElementById('documentForm');
-    const nameInput = document.getElementById('name');
-    const rollNoInput = document.getElementById('rollNo');
-    const sectionInput = document.getElementById('section');
-    const generateBtn = document.getElementById('generateBtn');
-    const previewBtn = document.getElementById('previewBtn');
-    const previewSection = document.getElementById('previewSection');
-    const previewName = document.getElementById('previewName');
-    const previewRollNo = document.getElementById('previewRollNo');
-    const previewSectionValue = document.getElementById('previewSection');
-    const debugPanel = document.getElementById('debugPanel');
-    const debugInfo = document.getElementById('debugInfo');
-    
-    // Show debug info function
-    function addDebugInfo(message) {
-        if (debugPanel && debugInfo) {
-            const timestamp = new Date().toLocaleTimeString();
-            debugInfo.innerHTML += `[${timestamp}] ${message}\n`;
-            debugPanel.scrollTop = debugPanel.scrollHeight;
-        }
-        console.log(message);
+    if (statusMessages) {
+        statusMessages.appendChild(statusDiv);
+        statusMessages.scrollTop = statusMessages.scrollHeight;
     }
     
-    // Show/hide debug panel
-    window.toggleDebug = function() {
-        debugPanel.classList.toggle('hidden');
-    };
+    console.log(`[${type.toUpperCase()}] ${message}`);
+}
+
+// Enable/disable form
+function enableForm(enabled) {
+    if (generateBtn) generateBtn.disabled = !enabled;
+    if (previewBtn) previewBtn.disabled = !enabled;
     
-    // Clear debug info
-    window.clearDebug = function() {
-        if (debugInfo) {
-            debugInfo.innerHTML = '';
-        }
-    };
+    if (enabled) {
+        addStatus('✅ Form enabled - ready to generate documents', 'success');
+    } else {
+        addStatus('⚠️ Form disabled - waiting for libraries', 'warning');
+    }
+}
+
+// Initialize form handlers
+function initFormHandlers() {
+    if (!documentForm) return;
     
     // Preview button click handler
     previewBtn.addEventListener('click', function() {
@@ -105,114 +128,17 @@ function initApplication() {
         // Show preview section
         previewSection.classList.remove('hidden');
         
-        addDebugInfo('Preview updated with values');
+        addStatus('📊 Preview updated', 'info');
     });
-    
-    // Function to load template file
-    function loadTemplate() {
-        addDebugInfo('Loading template.docx...');
-        
-        return new Promise(function(resolve, reject) {
-            // Use XMLHttpRequest for better binary handling
-            const xhr = new XMLHttpRequest();
-            xhr.open('GET', 'template.docx', true);
-            xhr.responseType = 'arraybuffer';
-            
-            xhr.onload = function() {
-                if (xhr.status === 200) {
-                    addDebugInfo(`✅ Template loaded: ${xhr.response.byteLength} bytes`);
-                    resolve(xhr.response);
-                } else {
-                    addDebugInfo(`❌ Failed to load template: HTTP ${xhr.status}`);
-                    reject(new Error(`Failed to load template: HTTP ${xhr.status}`));
-                }
-            };
-            
-            xhr.onerror = function() {
-                addDebugInfo('❌ Network error loading template');
-                reject(new Error('Network error loading template'));
-            };
-            
-            xhr.send();
-        });
-    }
-    
-    // Function to generate document
-    async function generateDocument(data) {
-        try {
-            addDebugInfo('Starting document generation...');
-            addDebugInfo(`Data: ${JSON.stringify(data)}`);
-            
-            // Load the template
-            const arrayBuffer = await loadTemplate();
-            
-            // Convert array buffer to binary string (compatible with JSZip 2.x)
-            const bytes = new Uint8Array(arrayBuffer);
-            let binaryString = '';
-            
-            for (let i = 0; i < bytes.length; i++) {
-                binaryString += String.fromCharCode(bytes[i]);
-            }
-            
-            addDebugInfo(`Converted to binary string: ${binaryString.length} chars`);
-            
-            // Create JSZip instance with the content
-            // JSZip 2.x accepts content in constructor
-            const zip = new JSZip(binaryString);
-            
-            // Create docxtemplater instance
-            const doc = new docxtemplater();
-            doc.loadZip(zip);
-            
-            // Set the data
-            doc.setData(data);
-            
-            // Render the document
-            try {
-                doc.render();
-                addDebugInfo('✅ Template rendered successfully');
-            } catch (renderError) {
-                addDebugInfo(`❌ Template render error: ${renderError.message}`);
-                
-                // Provide helpful error message
-                let errorMessage = 'Template Error: ' + renderError.message;
-                
-                if (renderError.properties && renderError.properties.key) {
-                    errorMessage += `\nError at placeholder: ${renderError.properties.key}`;
-                    
-                    // Check if placeholder exists
-                    const placeholders = ['name', 'rollNo', 'section'];
-                    const missingPlaceholders = placeholders.filter(p => !data[p]);
-                    
-                    if (missingPlaceholders.length > 0) {
-                        errorMessage += `\nMissing data for: ${missingPlaceholders.join(', ')}`;
-                    }
-                }
-                
-                throw new Error(errorMessage);
-            }
-            
-            // Generate the output
-            addDebugInfo('Generating output file...');
-            
-            // Generate as blob
-            const out = doc.getZip().generate({
-                type: 'blob',
-                mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-            });
-            
-            addDebugInfo(`✅ Document generated: ${out.size} bytes`);
-            return out;
-            
-        } catch (error) {
-            addDebugInfo(`❌ Document generation failed: ${error.message}`);
-            throw error;
-        }
-    }
     
     // Form submission handler
     documentForm.addEventListener('submit', async function(e) {
         e.preventDefault();
+        
+        if (!state.librariesLoaded) {
+            addStatus('❌ Libraries not loaded yet. Please wait.', 'error');
+            return;
+        }
         
         // Get form values
         const name = nameInput.value.trim();
@@ -232,71 +158,8 @@ function initApplication() {
             section: section
         };
         
-        // Disable button and show loading state
-        const originalText = generateBtn.innerHTML;
-        generateBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generating...';
-        generateBtn.disabled = true;
-        previewBtn.disabled = true;
-        
-        // Show debug panel during generation
-        debugPanel.classList.remove('hidden');
-        addDebugInfo('=== Starting Document Generation ===');
-        
-        try {
-            // Generate the document
-            const startTime = Date.now();
-            const docBlob = await generateDocument(templateData);
-            const endTime = Date.now();
-            
-            addDebugInfo(`Generation time: ${endTime - startTime}ms`);
-            
-            // Create filename
-            const safeName = name.replace(/[^\w\s.-]/gi, '_');
-            const safeRollNo = rollNo.replace(/[^\w\s.-]/gi, '_');
-            const filename = `${safeName}_${safeRollNo}.docx`;
-            
-            // Save the file
-            saveAs(docBlob, filename);
-            
-            addDebugInfo(`✅ File saved as: ${filename}`);
-            
-            // Show success message
-            setTimeout(function() {
-                alert(`✅ Document generated successfully!\n\nFile: ${filename}\n\nCheck your downloads folder.`);
-            }, 500);
-            
-        } catch (error) {
-            console.error('Error:', error);
-            
-            // Show user-friendly error message
-            let errorMessage = 'Failed to generate document.\n\n';
-            
-            if (error.message.includes('Template file') || error.message.includes('Failed to load')) {
-                errorMessage += 'Could not load the template file.\n\n';
-                errorMessage += 'Please ensure:\n';
-                errorMessage += '1. template.docx exists in the same folder\n';
-                errorMessage += '2. The file name is exactly "template.docx"\n';
-                errorMessage += '3. The file is a valid Word document';
-            } else if (error.message.includes('Template Error')) {
-                errorMessage += error.message + '\n\n';
-                errorMessage += 'Make sure your template contains:\n';
-                errorMessage += '• {{name}}\n';
-                errorMessage += '• {{rollNo}}\n';
-                errorMessage += '• {{section}}';
-            } else {
-                errorMessage += 'Error: ' + error.message;
-            }
-            
-            alert(errorMessage);
-            
-        } finally {
-            // Restore button state
-            generateBtn.innerHTML = originalText;
-            generateBtn.disabled = false;
-            previewBtn.disabled = false;
-            
-            addDebugInfo('=== Generation Complete ===\n');
-        }
+        // Generate document
+        await generateAndDownloadDocument(templateData);
     });
     
     // Real-time validation
@@ -307,82 +170,259 @@ function initApplication() {
                              sectionInput.value.trim();
             
             // Enable/disable buttons
-            generateBtn.disabled = !allFilled;
-            previewBtn.disabled = !allFilled;
+            if (generateBtn) generateBtn.disabled = !allFilled || !state.librariesLoaded;
+            if (previewBtn) previewBtn.disabled = !allFilled;
             
             // Update preview if section is visible
-            if (!previewSection.classList.contains('hidden')) {
+            if (previewSection && !previewSection.classList.contains('hidden')) {
                 previewBtn.click();
             }
         });
     });
     
     // Initialize button states
+    enableForm(false);
+}
+
+// Load template file
+async function loadTemplateFile() {
+    addStatus('📥 Loading template.docx...', 'info');
+    
+    try {
+        // Use fetch API
+        const response = await fetch('template.docx');
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        // Get as array buffer
+        const arrayBuffer = await response.arrayBuffer();
+        
+        addStatus(`✅ Template loaded: ${arrayBuffer.byteLength} bytes`, 'success');
+        return arrayBuffer;
+        
+    } catch (error) {
+        addStatus(`❌ Failed to load template: ${error.message}`, 'error');
+        throw error;
+    }
+}
+
+// Generate and download document
+async function generateAndDownloadDocument(data) {
+    if (!state.librariesLoaded) {
+        addStatus('❌ Libraries not loaded', 'error');
+        return;
+    }
+    
+    // Disable button and show loading state
+    const originalText = generateBtn.innerHTML;
+    generateBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generating...';
     generateBtn.disabled = true;
     previewBtn.disabled = true;
     
-    // Test template on startup
-    testTemplateAvailability();
+    addStatus('🚀 Starting document generation...', 'info');
+    addStatus(`Data: ${JSON.stringify(data)}`, 'info');
     
-    addDebugInfo('✅ Application initialized');
-    addDebugInfo('Ready to generate documents!');
-    
-    // Expose some utility functions for debugging
-    window.app = {
-        testTemplate: testTemplateAvailability,
-        generateTest: function() {
-            const testData = {
-                name: "Test Student",
-                rollNo: "TEST001",
-                section: "Test Section"
-            };
-            
-            addDebugInfo('Running test generation...');
-            return generateDocument(testData);
-        },
-        getTemplateSize: async function() {
-            try {
-                const response = await fetch('template.docx');
-                const blob = await response.blob();
-                return blob.size;
-            } catch (error) {
-                return 'Error: ' + error.message;
-            }
-        }
-    };
-    
-    // Function to test template availability
-    async function testTemplateAvailability() {
-        addDebugInfo('Testing template availability...');
+    try {
+        // Load template
+        const templateArrayBuffer = await loadTemplateFile();
         
-        try {
-            const response = await fetch('template.docx', { method: 'HEAD' });
-            
-            if (response.ok) {
-                const sizeResponse = await fetch('template.docx');
-                const blob = await sizeResponse.blob();
-                
-                addDebugInfo(`✅ Template found: ${blob.size} bytes`);
-                
-                // Check if it's a valid DOCX
-                const arrayBuffer = await blob.slice(0, 4).arrayBuffer();
-                const view = new Uint8Array(arrayBuffer);
-                const signature = view[0] === 0x50 && view[1] === 0x4B; // "PK" signature
-                
-                if (signature) {
-                    addDebugInfo('✅ Valid DOCX/ZIP file detected');
-                } else {
-                    addDebugInfo('⚠️ File may not be a valid DOCX');
-                }
-                
-                return true;
-            } else {
-                addDebugInfo(`❌ Template not found: HTTP ${response.status}`);
-                return false;
-            }
-        } catch (error) {
-            addDebugInfo(`❌ Template check failed: ${error.message}`);
-            return false;
+        if (!templateArrayBuffer || templateArrayBuffer.byteLength === 0) {
+            throw new Error('Template is empty');
         }
+        
+        addStatus('🔧 Creating document from template...', 'info');
+        
+        // Convert array buffer to binary string for PizZip
+        const bytes = new Uint8Array(templateArrayBuffer);
+        let binaryString = '';
+        
+        for (let i = 0; i < bytes.length; i++) {
+            binaryString += String.fromCharCode(bytes[i]);
+        }
+        
+        addStatus(`Converted to binary string: ${binaryString.length} characters`, 'info');
+        
+        // Create PizZip instance with the content
+        // PizZip accepts content in constructor (unlike JSZip 3.0)
+        const zip = new PizZip(binaryString);
+        
+        // Create docxtemplater instance
+        const doc = new docxtemplater();
+        doc.loadZip(zip);
+        
+        // Set the data
+        doc.setData(data);
+        
+        // Render the document
+        try {
+            doc.render();
+            addStatus('✅ Template rendered successfully', 'success');
+        } catch (renderError) {
+            addStatus(`❌ Template render error: ${renderError.message}`, 'error');
+            
+            let errorDetails = 'Template Error:\n' + renderError.message;
+            
+            if (renderError.properties && renderError.properties.key) {
+                errorDetails += `\nAt placeholder: ${renderError.properties.key}`;
+                
+                // Check for common issues
+                if (renderError.message.includes('not found')) {
+                    errorDetails += '\n\nMake sure your template contains exactly:';
+                    errorDetails += '\n• {{name}}';
+                    errorDetails += '\n• {{rollNo}}';
+                    errorDetails += '\n• {{section}}';
+                }
+            }
+            
+            throw new Error(errorDetails);
+        }
+        
+        // Generate the output
+        addStatus('💾 Generating output file...', 'info');
+        
+        const out = doc.getZip().generate({
+            type: 'blob',
+            mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            compression: 'DEFLATE'
+        });
+        
+        addStatus(`✅ Document generated: ${out.size} bytes`, 'success');
+        
+        // Create filename
+        const safeName = data.name.replace(/[^\w\s.-]/gi, '_');
+        const safeRollNo = data.rollNo.replace(/[^\w\s.-]/gi, '_');
+        const filename = `${safeName}_${safeRollNo}.docx`;
+        
+        // Save the file
+        saveAs(out, filename);
+        
+        addStatus(`📥 File saved as: ${filename}`, 'success');
+        
+        // Show success message
+        setTimeout(() => {
+            alert(`✅ Document generated successfully!\n\nFile: ${filename}\n\nCheck your downloads folder.`);
+        }, 500);
+        
+    } catch (error) {
+        console.error('Generation error:', error);
+        
+        // Show user-friendly error message
+        let errorMessage = 'Failed to generate document.\n\n';
+        
+        if (error.message.includes('Template file') || error.message.includes('Failed to load') || error.message.includes('HTTP')) {
+            errorMessage += 'Could not load the template file.\n\n';
+            errorMessage += 'Please ensure:\n';
+            errorMessage += '1. template.docx exists in the same folder\n';
+            errorMessage += '2. The file name is exactly "template.docx"\n';
+            errorMessage += '3. The file is a valid Word document (.docx)';
+        } else if (error.message.includes('Template Error')) {
+            errorMessage += error.message;
+        } else if (error.message.includes('PizZip') || error.message.includes('constructor')) {
+            errorMessage += 'Library compatibility issue.\n\n';
+            errorMessage += 'Please try:\n';
+            errorMessage += '1. Refreshing the page\n';
+            errorMessage += '2. Using a different browser\n';
+            errorMessage += '3. Checking browser console (F12) for details';
+        } else {
+            errorMessage += 'Error: ' + error.message;
+        }
+        
+        alert(errorMessage);
+        addStatus(`❌ Error: ${error.message}`, 'error');
+        
+    } finally {
+        // Restore button state
+        generateBtn.innerHTML = originalText;
+        generateBtn.disabled = !state.librariesLoaded;
+        previewBtn.disabled = false;
+        
+        addStatus('=== Generation complete ===', 'info');
     }
 }
+
+// Test template availability
+async function testTemplateAvailability() {
+    addStatus('🔍 Testing template availability...', 'info');
+    
+    try {
+        const response = await fetch('template.docx', { method: 'HEAD' });
+        
+        if (response.ok) {
+            // Get file size
+            const sizeResponse = await fetch('template.docx');
+            const blob = await sizeResponse.blob();
+            
+            addStatus(`✅ Template found: ${blob.size} bytes (${(blob.size / 1024).toFixed(2)} KB)`, 'success');
+            
+            // Check if it's a valid DOCX (ZIP file)
+            const arrayBuffer = await blob.slice(0, 4).arrayBuffer();
+            const view = new Uint8Array(arrayBuffer);
+            
+            // DOCX files start with "PK" (ZIP signature)
+            const isZipFile = view[0] === 0x50 && view[1] === 0x4B;
+            
+            if (isZipFile) {
+                addStatus('✅ Valid DOCX/ZIP file detected', 'success');
+            } else {
+                addStatus('⚠️ File may not be a valid DOCX (missing ZIP signature)', 'warning');
+            }
+            
+            return true;
+        } else {
+            addStatus(`❌ Template not found (HTTP ${response.status})`, 'error');
+            addStatus('Please ensure template.docx exists in the same folder as index.html', 'warning');
+            return false;
+        }
+    } catch (error) {
+        addStatus(`❌ Template check failed: ${error.message}`, 'error');
+        return false;
+    }
+}
+
+// Expose utility functions for debugging
+window.debugTools = {
+    testLibraries: function() {
+        return {
+            PizZip: typeof PizZip !== 'undefined',
+            docxtemplater: typeof docxtemplater !== 'undefined',
+            FileSaver: typeof saveAs !== 'undefined',
+            state: state
+        };
+    },
+    
+    testTemplate: testTemplateAvailability,
+    
+    createTestDocument: async function() {
+        const testData = {
+            name: "Test Student",
+            rollNo: "TEST001",
+            section: "Test Section"
+        };
+        
+        addStatus('🧪 Creating test document...', 'info');
+        return generateAndDownloadDocument(testData);
+    },
+    
+    clearStatus: function() {
+        if (statusMessages) {
+            statusMessages.innerHTML = '';
+            addStatus('Status cleared', 'info');
+        }
+    }
+};
+
+// Add keyboard shortcut for debugging (Ctrl+Shift+D)
+document.addEventListener('keydown', function(e) {
+    if (e.ctrlKey && e.shiftKey && e.key === 'D') {
+        e.preventDefault();
+        const debugInfo = window.debugTools.testLibraries();
+        console.table(debugInfo);
+        addStatus('Debug info logged to console (F12)', 'info');
+    }
+});
+
+// Initial status
+addStatus('Document Generator starting up...', 'info');
+addStatus('Using PizZip + docxtemplater + FileSaver.js', 'info');
