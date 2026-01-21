@@ -98,30 +98,19 @@
                 </div>
             </div>
             
-            <!-- Loading indicator -->
-            <div id="loadingIndicator" class="loading-indicator hidden">
-                <div class="loading-content">
-                    <i class="fas fa-spinner fa-spin"></i>
-                    <p>Loading libraries...</p>
-                </div>
-            </div>
-            
-            <!-- Debug panel (hidden by default) -->
-            <div id="debugPanel" class="debug-panel hidden">
-                <h3><i class="fas fa-bug"></i> Debug Information</h3>
-                <div id="debugInfo"></div>
-            </div>
+            <!-- Status messages -->
+            <div id="statusMessages" class="status-messages"></div>
         </main>
 
         <footer>
             <p>Document Automation Tool | Built for Academic Lab Automation | Runs entirely in browser</p>
-            <p class="version-info">Using JSZip 2.7.1 + docxtemplater 3.42.4</p>
+            <p class="version-info">Using PizZip + docxtemplater</p>
         </footer>
     </div>
 
-    <!-- Load required libraries from CDN in correct order -->
-    <!-- Using JSZip 2.7.1 for compatibility with docxtemplater -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/2.7.1/jszip.min.js"></script>
+    <!-- Load required libraries from CDN -->
+    <!-- Using PizZip (JSZip fork) which works better with docxtemplater -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pizzip/3.1.1/pizzip.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/docxtemplater/3.42.4/docxtemplater.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
     
